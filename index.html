@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="숫자야구 해결사: 부른 숫자와 스트라이크·볼 결과를 넣으면 가능한 정답을 좁히고 다음에 부를 숫자를 추천해 주는 무료 숫자야구 계산기. 2자리~5자리, 0 포함 지원.">
+<meta name="keywords" content="숫자야구, 숫자야구 해결사, 숫자야구 계산기, 숫자야구 정답, 숫자야구 공략, 불스앤카우">
+<meta property="og:title" content="숫자야구 해결사">
+<meta property="og:description" content="스트라이크·볼만 넣으면 다음에 부를 숫자를 추천해 줘요.">
+<meta property="og:type" content="website">
+<style>html{-webkit-text-size-adjust:100%}body{margin:0}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}[hidden]{display:none!important}</style>
+<title>숫자야구 해결사</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: one narrow column of stacked panels, read like a ballpark scoreboard — recommendation on top, input in the middle, log below */
+:root{
+  --bg:#edf1f5; --panel:#ffffff; --sunk:#e2e8ef; --line:#cdd7e2; --fg:#132031; --muted:#56687c;
+  --acc:#0a74b0; --acc-ink:#ffffff;
+  --s:#15803d; --s-ink:#ffffff; --b:#c2680a; --b-ink:#ffffff; --o:#c62828;
+  --win-bg:#e2f5e9; --win-line:#86cfa1;
+  --font-ui:"Noto Sans KR",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --font-num:"Space Grotesk",ui-monospace,"SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d141c; --panel:#16212c; --sunk:#0a1017; --line:#26374a; --fg:#e8eef5; --muted:#8ba0b5;
+    --acc:#38bdf8; --acc-ink:#03202e;
+    --s:#22c55e; --s-ink:#03210e; --b:#f59e0b; --b-ink:#291900; --o:#f05252;
+    --win-bg:#0f2d22; --win-line:#2f7a55;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d141c; --panel:#16212c; --sunk:#0a1017; --line:#26374a; --fg:#e8eef5; --muted:#8ba0b5;
+  --acc:#38bdf8; --acc-ink:#03202e;
+  --s:#22c55e; --s-ink:#03210e; --b:#f59e0b; --b-ink:#291900; --o:#f05252;
+  --win-bg:#0f2d22; --win-line:#2f7a55;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:15px;-webkit-tap-highlight-color:transparent}
+.wrap{max-width:500px;margin:0 auto;padding-block:16px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:12px}
+button{font-family:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button:disabled{cursor:default}
+
+header h1{font-size:22px;font-weight:900;margin:0;letter-spacing:-.3px;text-wrap:balance}
+header p{margin:4px 0 0;color:var(--muted);font-size:13px;line-height:1.5}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.label{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.06em;margin:0}
+
+/* settings */
+.seg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.seg button{height:40px;border-radius:10px;border:1px solid var(--line);background:var(--sunk);font-size:15px;font-weight:700}
+.seg button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+.switch{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14px}
+.switch small{display:block;color:var(--muted);font-size:12px}
+.tog{position:relative;width:46px;height:28px;flex-shrink:0}
+.tog input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.tog span{position:absolute;inset:0;border-radius:99px;background:var(--line);transition:background .15s;pointer-events:none}
+.tog span::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--panel);transition:transform .15s}
+.tog input:checked+span{background:var(--acc)}
+.tog input:checked+span::after{transform:translateX(18px)}
+.tog input:focus-visible+span{outline:2px solid var(--acc);outline-offset:2px}
+.confirm{background:var(--sunk);border-radius:10px;padding:10px;display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:13px}
+.confirm span{flex:1 1 160px}
+.confirm button{height:34px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel);font-weight:700;font-size:13px}
+.confirm button.yes{background:var(--o);border-color:var(--o);color:#fff}
+
+/* recommendation */
+.reco{align-items:center;text-align:center}
+.reco .num{font-family:var(--font-num);font-size:44px;font-weight:700;letter-spacing:.22em;margin-right:-.22em;line-height:1.1;font-variant-numeric:tabular-nums}
+.reco .why{color:var(--muted);font-size:13px;line-height:1.5;margin:0}
+.reco.win{background:var(--win-bg);border-color:var(--win-line)}
+.reco .newgame{height:42px;padding:0 20px;border-radius:10px;border:none;background:var(--s);color:var(--s-ink);font-weight:700;font-size:15px}
+
+/* guess slots + keypad */
+.slots{display:flex;justify-content:center;gap:8px}
+.slot{flex:0 1 58px;min-width:0;height:64px;border-radius:12px;border:2px solid var(--line);background:var(--sunk);font-family:var(--font-num);font-size:32px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0}
+.slot.next{border-color:var(--acc)}
+.hint{text-align:center;font-size:12px;color:var(--muted);min-height:16px;margin:-4px 0 0}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.pad button{height:46px;border-radius:10px;border:1px solid var(--line);background:var(--sunk);font-family:var(--font-num);font-size:20px;font-weight:700}
+.pad button.fn{font-family:var(--font-ui);font-size:13px;color:var(--muted)}
+.pad button:disabled{opacity:.3}
+.pad button:not(:disabled):active{background:var(--line)}
+
+/* result pills */
+.res{display:flex;flex-direction:column;gap:8px}
+.rrow{display:flex;align-items:center;gap:8px}
+.rrow .k{width:68px;flex-shrink:0;font-weight:900;font-size:14px}
+.rrow .k.s{color:var(--s)} .rrow .k.b{color:var(--b)}
+.pills{display:flex;gap:5px;flex:1;min-width:0}
+.pill{flex:1;min-width:0;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--sunk);font-family:var(--font-num);font-size:17px;font-weight:700}
+.pill:disabled{opacity:.25}
+.pill.on.s{background:var(--s);border-color:var(--s);color:var(--s-ink)}
+.pill.on.b{background:var(--b);border-color:var(--b);color:var(--b-ink)}
+.outbtn{align-self:flex-start;height:32px;padding:0 12px;border-radius:99px;border:1px solid var(--o);background:transparent;color:var(--o);font-weight:700;font-size:13px}
+.outbtn.on{background:var(--o);color:#fff}
+.summary{font-size:13px;color:var(--muted);text-align:center;min-height:18px;margin:0}
+.err{color:var(--o);font-size:13px;text-align:center;min-height:18px;margin:0}
+.actions{display:grid;grid-template-columns:1fr 1fr 1.6fr;gap:8px}
+.actions button{height:50px;border-radius:12px;font-size:15px;font-weight:700;padding:0 4px}
+.btn-reset{border:1px solid var(--line);background:var(--sunk);color:var(--o)}
+.btn-reset.armed{background:var(--o);border-color:var(--o);color:#fff}
+.btn-ghost{border:1px solid var(--line);background:var(--sunk)}
+.btn-go{border:none;background:var(--acc);color:var(--acc-ink)}
+
+/* history */
+.hist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.hist li{display:grid;grid-template-columns:24px 1fr auto 32px;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.hist li:last-child{border-bottom:none}
+.hist .i{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.hist .g{font-family:var(--font-num);font-size:19px;font-weight:700;letter-spacing:.15em}
+.chips{display:flex;gap:4px}
+.chip{font-size:12px;font-weight:900;padding:3px 7px;border-radius:6px;font-family:var(--font-num)}
+.chip.s{background:var(--s);color:var(--s-ink)}
+.chip.b{background:var(--b);color:var(--b-ink)}
+.chip.o{background:var(--o);color:#fff;font-family:var(--font-ui)}
+.del{width:32px;height:32px;border-radius:8px;border:none;background:transparent;color:var(--muted);font-size:18px}
+.del:hover{background:var(--sunk)}
+.empty{color:var(--muted);font-size:13px;margin:0;line-height:1.5}
+
+/* candidates */
+.count{font-size:13px;color:var(--muted);margin:0}
+.count b{font-family:var(--font-num);font-size:22px;color:var(--fg);margin-right:2px}
+.cands{display:flex;flex-wrap:wrap;gap:6px;max-height:168px;overflow:auto}
+.cand{border:1px solid var(--line);background:var(--sunk);border-radius:8px;padding:5px 9px;font-family:var(--font-num);font-size:15px;font-weight:500;letter-spacing:.08em}
+
+details{font-size:13px;color:var(--muted);line-height:1.6}
+summary{cursor:pointer;font-weight:700;color:var(--fg)}
+details ol{margin:8px 0 0;padding-left:20px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>⚾ 숫자야구 해결사</h1>
+    <p>부른 숫자와 결과를 넣으면 가능한 정답을 좁히고, 다음에 부를 숫자를 추천해 줘요.</p>
+  </header>
+
+  <section class="panel" aria-label="설정">
+    <p class="label">자릿수</p>
+    <div class="seg" id="lenSeg">
+      <button id="len2" data-n="2">2자리</button>
+      <button id="len3" data-n="3">3자리</button>
+      <button id="len4" data-n="4">4자리</button>
+      <button id="len5" data-n="5">5자리</button>
+    </div>
+    <label class="switch" for="zero">
+      <span>0 포함<small>끄면 1~9, 켜면 0~9 (모두 서로 다른 숫자)</small></span>
+      <span class="tog"><input type="checkbox" id="zero"><span></span></span>
+    </label>
+    <div class="confirm" id="confirm" hidden>
+      <span id="confirmMsg"></span>
+      <button id="cNo">그대로 두기</button>
+      <button id="cYes" class="yes">바꾸기</button>
+    </div>
+  </section>
+
+  <section class="panel reco" id="recoCard" aria-live="polite">
+    <p class="label">다음에 부를 숫자</p>
+    <div class="num" id="reco">123</div>
+    <p class="why" id="why"></p>
+    <button class="newgame" id="newGame" hidden>새 게임 시작</button>
+  </section>
+
+  <section class="panel" id="inputCard" aria-label="결과 입력">
+    <p class="label">내가 부른 숫자</p>
+    <div class="slots" id="slots"></div>
+    <p class="hint" id="hint"></p>
+    <div class="pad" id="pad"></div>
+
+    <p class="label">상대가 알려준 결과</p>
+    <div class="res">
+      <div class="rrow"><span class="k s">스트라이크</span><div class="pills" id="pS"></div></div>
+      <div class="rrow"><span class="k b">볼</span><div class="pills" id="pB"></div></div>
+      <button class="outbtn" id="outBtn">아웃 (하나도 안 맞음)</button>
+    </div>
+    <p class="summary" id="summary"></p>
+    <p class="err" id="err"></p>
+    <div class="actions">
+      <button class="btn-reset" id="resetAll">초기화</button>
+      <button class="btn-ghost" id="undo">한 줄 취소</button>
+      <button class="btn-go" id="add">기록하기</button>
+    </div>
+  </section>
+
+  <section class="panel" aria-label="기록">
+    <p class="label">기록</p>
+    <ul class="hist" id="hist"></ul>
+  </section>
+
+  <section class="panel" aria-label="남은 후보">
+    <p class="label">남은 후보</p>
+    <p class="count"><b id="cnt">0</b>개 가능 · 누르면 입력칸에 들어가요</p>
+    <div class="cands" id="cands"></div>
+  </section>
+
+  <section class="panel">
+    <details>
+      <summary>사용법</summary>
+      <ol>
+        <li>위에서 자릿수와 0 포함 여부를 게임 규칙에 맞게 골라요.</li>
+        <li>입력칸에는 추천 숫자가 미리 들어가 있어요. 그대로 부르거나, 키패드로 다른 숫자를 넣어요.</li>
+        <li>상대가 알려준 스트라이크·볼을 누르고 <b>기록하기</b>. 하나도 안 맞으면 <b>아웃</b>을 눌러요.</li>
+        <li>잘못 넣었으면 <b>한 줄 취소</b>나 기록 옆 ✕로 지우면 돼요. 기록은 이 기기에 저장돼요.</li>
+        <li>처음부터 다시 하려면 <b>초기화</b>를 두 번 눌러요. 실수로 지우지 않게 한 번 더 확인해요.</li>
+      </ol>
+    </details>
+  </section>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const KEY = 'nb-solver-v2';
+let N = 3, zero = false, history = [], cur = '', S = null, B = null, touched = false;
+let all = [], reco = null, token = 0, pending = null;
+
+function load(){
+  try{
+    const d = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (d && d.N >= 2 && d.N <= 5){
+      N = d.N; zero = !!d.zero;
+      history = (Array.isArray(d.history) ? d.history : []).filter(h =>
+        h && typeof h.g === 'string' && h.g.length === N && Number.isInteger(h.s) && Number.isInteger(h.b));
+    }
+  }catch(e){}
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify({N, zero, history})); }catch(e){} }
+
+const digitPool = () => zero ? '0123456789' : '123456789';
+function build(){
+  all = []; const ds = digitPool();
+  const rec = p => { if (p.length === N){ all.push(p); return; } for (const d of ds) if (!p.includes(d)) rec(p + d); };
+  rec('');
+}
+function score(g, a){
+  let s = 0, b = 0;
+  for (let i = 0; i < N; i++){ if (g[i] === a[i]) s++; else if (a.includes(g[i])) b++; }
+  return [s, b];
+}
+function candidates(){
+  return all.filter(c => history.every(h => { const [s, b] = score(h.g, c); return s === h.s && b === h.b; }));
+}
+const validPair = (s, b) => s + b <= N && !(s === N - 1 && b === 1);
+
+const BUDGET = 2500000;
+function recommend(c){
+  if (!c.length) return null;
+  if (c.length === 1) return {g:c[0], only:true};
+  if (!history.length) return {g:'123456789'.slice(0, N), first:true};
+  const cs = new Set(c); let pool;
+  if (c.length * all.length <= BUDGET) pool = all;
+  else {
+    const size = Math.max(60, Math.floor(BUDGET / c.length)), set = new Set();
+    const sh = c.slice().sort(() => Math.random() - .5);
+    for (const x of sh){ if (set.size >= size / 2) break; set.add(x); }
+    let guard = 0;
+    while (set.size < size && guard++ < size * 5) set.add(all[(Math.random() * all.length) | 0]);
+    pool = [...set];
+  }
+  let best = null; const bk = new Int32Array(66);
+  for (const g of pool){
+    bk.fill(0);
+    for (const x of c){ const [s, b] = score(g, x); bk[s * 10 + b]++; }
+    let worst = 0, sq = 0;
+    for (let k = 0; k < 66; k++){ const v = bk[k]; if (v){ if (v > worst) worst = v; sq += v * v; } }
+    const exp = sq / c.length, isC = cs.has(g);
+    if (!best || exp < best.exp - 1e-9 || (Math.abs(exp - best.exp) < 1e-9 && (worst < best.worst || (worst === best.worst && isC && !best.isC))))
+      best = {g, worst, exp, isC};
+  }
+  return best;
+}
+
+/* ---------- drawing ---------- */
+function drawSettings(){
+  [...$('lenSeg').children].forEach(b => b.classList.toggle('on', +b.dataset.n === N));
+  $('zero').checked = zero;
+}
+function drawSlots(){
+  const box = $('slots'); box.innerHTML = '';
+  for (let i = 0; i < N; i++){
+    const b = document.createElement('button');
+    b.className = 'slot' + (i === cur.length ? ' next' : '');
+    b.id = 'slot' + i;
+    b.textContent = cur[i] || '';
+    b.setAttribute('aria-label', (i + 1) + '번째 자리' + (cur[i] ? ' ' + cur[i] : ' 비어 있음'));
+    b.onclick = () => { if (i < cur.length){ cur = cur.slice(0, i); touched = true; drawInput(); } };
+    box.appendChild(b);
+  }
+  const hint = $('hint');
+  if (reco && !touched && cur === reco.g) hint.textContent = '추천 숫자를 넣어 뒀어요. 칸을 누르면 그 자리부터 다시 입력해요.';
+  else if (cur.length < N) hint.textContent = `${cur.length + 1}번째 숫자를 눌러 줘요`;
+  else hint.textContent = '';
+}
+function drawPad(){
+  const pad = $('pad'); pad.innerHTML = '';
+  const keys = ['1','2','3','4','5','6','7','8','9','reco','0','back'];
+  for (const k of keys){
+    const b = document.createElement('button');
+    b.id = 'key-' + k;
+    if (k === 'reco'){ b.textContent = '추천 넣기'; b.className = 'fn'; b.disabled = !reco; b.onclick = useReco; }
+    else if (k === 'back'){ b.textContent = '⌫ 지우기'; b.className = 'fn'; b.disabled = !cur.length; b.onclick = back; }
+    else { b.textContent = k; b.disabled = cur.length >= N || cur.includes(k) || (k === '0' && !zero); b.onclick = () => typeDigit(k); }
+    pad.appendChild(b);
+  }
+}
+function drawPills(){
+  const mk = (id, cls, val, other, isS) => {
+    const box = $(id); box.innerHTML = '';
+    for (let i = 0; i <= N; i++){
+      const p = document.createElement('button');
+      p.className = 'pill ' + cls + (val === i ? ' on' : '');
+      p.id = id + '-' + i; p.textContent = i;
+      p.disabled = other !== null && !(isS ? validPair(i, other) : validPair(other, i));
+      p.onclick = () => isS ? setS(i) : setB(i);
+      box.appendChild(p);
+    }
+  };
+  mk('pS', 's', S, B, true);
+  mk('pB', 'b', B, S, false);
+  $('outBtn').classList.toggle('on', S === 0 && B === 0);
+  const sm = $('summary');
+  if (S === null || B === null) sm.textContent = S === null && B === null ? '' : '스트라이크와 볼을 둘 다 골라 줘요';
+  else if (S === N) sm.textContent = `${N}스트라이크, 정답!`;
+  else if (S + B === 0) sm.textContent = '아웃: 맞는 숫자가 하나도 없어요';
+  else sm.textContent = `${S}스트라이크 ${B}볼 · 안 맞는 숫자 ${N - S - B}개`;
+}
+function drawInput(){ drawSlots(); drawPad(); drawPills(); }
+
+function chips(s, b){
+  if (s === 0 && b === 0) return '<span class="chip o">아웃</span>';
+  let h = '';
+  if (s) h += `<span class="chip s">${s}S</span>`;
+  if (b) h += `<span class="chip b">${b}B</span>`;
+  return h;
+}
+function drawHistory(){
+  const ul = $('hist'); ul.innerHTML = '';
+  if (!history.length){ ul.innerHTML = '<li style="display:block"><p class="empty">아직 기록이 없어요. 추천 숫자를 부르고 결과를 넣어 봐요.</p></li>'; return; }
+  history.forEach((h, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="i">${i + 1}</span><span class="g">${h.g}</span><span class="chips">${chips(h.s, h.b)}</span>`;
+    const d = document.createElement('button');
+    d.className = 'del'; d.id = 'del' + i; d.textContent = '✕'; d.setAttribute('aria-label', (i + 1) + '번째 기록 지우기');
+    d.onclick = () => { history.splice(i, 1); save(); update(); };
+    li.appendChild(d); ul.appendChild(li);
+  });
+}
+function drawCands(c){
+  $('cnt').textContent = c.length;
+  const box = $('cands'); box.innerHTML = '';
+  c.slice(0, 150).forEach(x => {
+    const b = document.createElement('button'); b.className = 'cand'; b.textContent = x;
+    b.onclick = () => { cur = x; touched = true; drawInput(); $('inputCard').scrollIntoView({behavior:'smooth', block:'start'}); };
+    box.appendChild(b);
+  });
+  if (c.length > 150){ const s = document.createElement('span'); s.className = 'empty'; s.textContent = `… 외 ${c.length - 150}개`; box.appendChild(s); }
+}
+
+function setReco(text, why, win, showNew){
+  $('reco').textContent = text; $('why').textContent = why;
+  $('recoCard').classList.toggle('win', !!win);
+  $('newGame').hidden = !showNew;
+}
+
+function update(){
+  drawSettings(); drawHistory();
+  const c = candidates(); drawCands(c);
+  const last = history[history.length - 1];
+  reco = null;
+  if (last && last.s === N){
+    setReco(last.g, `🎉 ${history.length}번 만에 맞혔어요!`, true, true);
+    drawInput(); return;
+  }
+  if (!c.length){
+    setReco('???', '조건에 맞는 숫자가 없어요. 결과를 잘못 넣은 줄이 있는지 확인해 줘요. 아래 기록에서 ✕로 지울 수 있어요.', false, false);
+    drawInput(); return;
+  }
+  setReco('·'.repeat(N), '계산 중…', false, false);
+  drawInput();
+  const t = ++token;
+  setTimeout(() => {
+    if (t !== token) return;
+    reco = recommend(c);
+    let why;
+    if (reco.first) why = '첫 수는 서로 다른 숫자면 뭘 불러도 똑같아요. 이걸로 시작!';
+    else if (reco.only) why = '정답은 이거 하나뿐이에요! 🎯';
+    else why = `이걸 부르면 후보가 평균 ${reco.exp.toFixed(1)}개, 많아도 ${reco.worst}개로 줄어요` + (reco.isC ? '. 이게 정답일 수도 있어요.' : '.');
+    setReco(reco.g, why, reco.only, false);
+    if (!touched) cur = reco.g;
+    drawInput();
+  }, 30);
+}
+
+/* ---------- actions ---------- */
+function typeDigit(k){
+  if (!touched){ cur = ''; touched = true; }
+  if (cur.length >= N || cur.includes(k) || (k === '0' && !zero)) return;
+  cur += k; $('err').textContent = ''; drawInput();
+}
+function back(){ touched = true; cur = cur.slice(0, -1); drawInput(); }
+function useReco(){ if (reco){ cur = reco.g; touched = false; drawInput(); } }
+function setS(v){ S = (S === v ? null : v); if (S === N) B = 0; if (B !== null && S !== null && !validPair(S, B)) B = null; $('err').textContent = ''; drawPills(); }
+function setB(v){ B = (B === v ? null : v); if (S !== null && B !== null && !validPair(S, B)) S = null; $('err').textContent = ''; drawPills(); }
+
+function add(){
+  const err = $('err');
+  if (history.length && history[history.length - 1].s === N){ err.textContent = '이미 정답을 맞혔어요. 새 게임을 시작해 줘요.'; return; }
+  if (cur.length !== N){ err.textContent = `숫자 ${N}개를 모두 넣어 줘요.`; return; }
+  if (S === null || B === null){ err.textContent = '스트라이크와 볼을 골라 줘요. 하나도 안 맞았으면 아웃을 눌러요.'; return; }
+  history.push({g:cur, s:S, b:B}); save();
+  cur = ''; S = B = null; touched = false; err.textContent = '';
+  update();
+}
+function resetGame(){ history = []; cur = ''; S = B = null; touched = false; $('err').textContent = ''; save(); update(); }
+
+function applySetting(n, z){
+  N = n; zero = z; build(); resetGame();
+}
+function askSetting(n, z){
+  if (n === N && z === zero) return;
+  if (!history.length){ applySetting(n, z); return; }
+  pending = {n, z};
+  $('confirmMsg').textContent = `설정을 바꾸면 지금 기록 ${history.length}줄이 지워져요.`;
+  $('confirm').hidden = false;
+  drawSettings();
+}
+
+$('lenSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) askSetting(+b.dataset.n, zero); });
+$('zero').addEventListener('change', e => { const z = e.target.checked; e.target.checked = zero; askSetting(N, z); });
+$('cYes').onclick = () => { $('confirm').hidden = true; if (pending){ applySetting(pending.n, pending.z); pending = null; } };
+$('cNo').onclick = () => { $('confirm').hidden = true; pending = null; drawSettings(); };
+$('outBtn').onclick = () => { S = 0; B = 0; $('err').textContent = ''; drawPills(); };
+$('add').onclick = add;
+$('undo').onclick = () => { if (history.length){ history.pop(); save(); update(); } };
+$('newGame').onclick = resetGame;
+let armTimer = null;
+function disarm(){ clearTimeout(armTimer); armTimer = null; const r = $('resetAll'); r.classList.remove('armed'); r.textContent = '초기화'; }
+$('resetAll').onclick = () => {
+  const r = $('resetAll');
+  if (!history.length){ disarm(); resetGame(); return; }
+  if (armTimer){ disarm(); resetGame(); return; }
+  r.classList.add('armed'); r.textContent = '한 번 더!';
+  armTimer = setTimeout(disarm, 3000);
+};
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (/^[0-9]$/.test(e.key)){ typeDigit(e.key); e.preventDefault(); }
+  else if (e.key === 'Backspace'){ back(); e.preventDefault(); }
+  else if (e.key === 'Enter' && e.target.tagName !== 'BUTTON'){ add(); e.preventDefault(); }
+});
+
+load(); build(); update();
+</script>
+
+</body>
+</html>
